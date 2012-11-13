@@ -31,7 +31,9 @@
     NSString *identifier = [self _eventIdentifier:eventName];
     
     NSNotificationCenter *center = [NSNotificationCenter defaultCenter];
-    [center addObserver:self selector:selector name:identifier object:self];
+    [center addObserverForName:identifier object:nil queue:nil usingBlock:^(NSNotification *note) {
+        [object performSelector:selector withObject:self];
+    }];
 }
 
 #pragma mark - Private
