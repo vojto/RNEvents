@@ -11,22 +11,59 @@
 
 static void *RNEventsEventObserversKey;
 
+@implementation RNEventBus
+
++ (RNEventBus *)sharedBus {
+    static RNEventBus *_sharedInstance;
+
+    @synchronized(self) {
+        if (!_sharedInstance)
+            _sharedInstance = [[RNEventBus alloc] init];
+        return _sharedInstance;
+    }
+}
+
++ (void)trigger:(NSString *)eventName {
+    [[self sharedBus] trigger:eventName];
+}
+
++ (void)on:(NSString *)eventName block:(void (^)(void))handler {
+    [[self sharedBus] on:eventName block:handler];
+}
+
++ (void)on:(NSString *)eventName object:(id)object selector:(SEL)selector {
+    [[self sharedBus] on:eventName object:object selector:selector];
+}
+
++ (void)off:(NSString *)eventName {
+    [[self sharedBus] off:eventName];
+}
+
+@end
+
 @implementation NSObject (RNEvents)
 
 - (void)trigger:(NSString *)eventName {
+    [self trigger:eventName data:nil];
+}
+
+- (void)trigger:(NSString *)eventName data:(id)data {
     NSString *identifier = [self _eventIdentifier:eventName];
-    
+
     NSNotificationCenter *center = [NSNotificationCenter defaultCenter];
-    NSNotification *notification = [NSNotification notificationWithName:identifier object:self];
+    NSDictionary *userInfo = @{@"data": data};
+    NSNotification *notification = [NSNotification notificationWithName:identifier object:self userInfo:userInfo];
     [center postNotification:notification];
 }
 
-- (void)on:(NSString *)eventName block:(void (^)(void))handler {
+- (void)on:(NSString *)eventName block:(void (^)(id data))handler {
     NSString *identifier = [self _eventIdentifier:eventName];
     
     NSNotificationCenter *center = [NSNotificationCenter defaultCenter];
     id observer = [center addObserverForName:identifier object:self queue:nil usingBlock:^(NSNotification *note) {
-        handler();
+        NSDictionary *userInfo = note.userInfo;
+        id data = userInfo[@"data"];
+        handler(data);
     }];
     [self _addObserver:observer forIdentifier:identifier];
 }
