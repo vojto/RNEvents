@@ -27,7 +27,11 @@ static void *RNEventsEventObserversKey;
     [[self sharedBus] trigger:eventName];
 }
 
-+ (void)on:(NSString *)eventName block:(void (^)(void))handler {
++ (void)trigger:(NSString *)eventName data:(id)data {
+    [[self sharedBus] trigger:eventName data:data];
+}
+
++ (void)on:(NSString *)eventName block:(void (^)(id data))handler {
     [[self sharedBus] on:eventName block:handler];
 }
 
@@ -44,7 +48,7 @@ static void *RNEventsEventObserversKey;
 @implementation NSObject (RNEvents)
 
 - (void)trigger:(NSString *)eventName {
-    [self trigger:eventName data:nil];
+    [self trigger:eventName data:[NSNull null]];
 }
 
 - (void)trigger:(NSString *)eventName data:(id)data {
@@ -61,7 +65,7 @@ static void *RNEventsEventObserversKey;
     
     NSNotificationCenter *center = [NSNotificationCenter defaultCenter];
     id observer = [center addObserverForName:identifier object:self queue:nil usingBlock:^(NSNotification *note) {
-        NSDictionary *userInfo = note.userInfo;
+        NSDictionary *userInfo = [note userInfo];
         id data = userInfo[@"data"];
         handler(data);
     }];
@@ -73,7 +77,18 @@ static void *RNEventsEventObserversKey;
     
     NSNotificationCenter *center = [NSNotificationCenter defaultCenter];
     id observer = [center addObserverForName:identifier object:nil queue:nil usingBlock:^(NSNotification *note) {
-        [object performSelector:selector withObject:self];
+        NSDictionary *userInfo = [note userInfo];
+        id data = userInfo[@"data"];
+
+        NSMethodSignature *signature = [object methodSignatureForSelector:selector];
+        NSInteger argCount = [signature numberOfArguments] - 2;
+        if (argCount == 1) {
+            [object performSelector:selector withObject:self];
+        } else if (argCount == 2) {
+            [object performSelector:selector withObject:self withObject:data];
+        } else {
+            [NSException raise:@"Unsupported number of arguments" format:@"%d", argCount];
+        }
     }];
     [self _addObserver:observer forIdentifier:identifier];
 }
